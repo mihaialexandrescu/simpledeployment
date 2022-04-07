@@ -1,0 +1,14 @@
+apiVersion: simplegroup.mihai.domain/v0
+kind: SimpleDeployment
+metadata:
+  name: sd3
+spec:
+  replicas: 1
+  image: nginx:latest
+  ingressInfo:
+    ingressControllerType: nginx
+    ingressClassName: nginx
+    host: 3.dev.local
+    publicPort: 443
+    #path: /
+    #rewriteTarget: /

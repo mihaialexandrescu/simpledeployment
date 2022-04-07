@@ -1,0 +1,132 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  labels:
+    homework: simpledeployment
+  name: simpledeployments.simplegroup.mihai.domain
+spec:
+  group: simplegroup.mihai.domain
+  names:
+    kind: SimpleDeployment
+    listKind: SimpleDeploymentList
+    plural: simpledeployments
+    shortNames:
+    - sd
+    - sds
+    singular: simpledeployment
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.image
+      name: CfgImage
+      type: string
+    - jsonPath: .spec.replicas
+      name: CfgReplicas
+      type: integer
+    - jsonPath: .status.deployment
+      name: Deployment
+      type: string
+    - jsonPath: .status.url
+      name: URL
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v0
+    schema:
+      openAPIV3Schema:
+        description: SimpleDeployment is the Schema for the simpledeployments API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SimpleDeploymentSpec defines the desired state of SimpleDeployment
+            properties:
+              image:
+                description: Container image name used by the underlying Deployment
+                  resource.
+                minLength: 0
+                type: string
+              ingressInfo:
+                description: 'Info on where the application will be published. Assumption:
+                  a single ingress rule will be used and there is already an Ingress
+                  Controller deployed.'
+                properties:
+                  host:
+                    description: Host part of link. Goes into host field in ingress
+                      rule.
+                    minLength: 0
+                    type: string
+                  ingressClassName:
+                    default: nginx
+                    description: IngressClassName is used to select which IngressController
+                      will be used by the Ingress the operator defines. Can be optional
+                      if there is a default Ingress Controller defined in the K8s
+                      cluster.
+                    type: string
+                  ingressControllerType:
+                    default: nginx
+                    description: IngressControllerType currently only supports nginx.
+                    enum:
+                    - nginx
+                    type: string
+                  path:
+                    default: /
+                    description: Path part of link. Goes into path field in ingress
+                      rule. Should start with "/".
+                    type: string
+                  publicPort:
+                    default: 443
+                    description: Port opened for this app on the Ingress Controller
+                      (prerequisite). This is NOT the port specified in the ingress
+                      rule for the backend service.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  rewriteTarget:
+                    description: Rewrite-target function.
+                    type: string
+                type: object
+              replicas:
+                default: 1
+                description: Number of replicas used by the underlying Deployment
+                  resource. It is a pointer so that users can set it to 0.
+                format: int32
+                maximum: 10
+                minimum: 0
+                type: integer
+            required:
+            - image
+            type: object
+          status:
+            description: SimpleDeploymentStatus defines the observed state of SimpleDeployment
+            properties:
+              deployment:
+                type: string
+              url:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

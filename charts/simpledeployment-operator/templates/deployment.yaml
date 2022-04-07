@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+    homework: simpledeployment
+    helm.sh/chart: {{ include "simpledeployment-operator.chart" . }}
+    app.kubernetes.io/name: {{ include "simpledeployment-operator.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  name: sd-controller-manager
+  #namespace: sd-sys
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      homework: simpledeployment
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller-manager
+        homework: simpledeployment
+    spec:
+      containers:
+      - args:
+        - --leader-elect
+        command:
+        - /manager
+        image: "{{ .Values.image.repository }}:{{ include "simpledeployment-operator.version" . }}"
+        env:
+          - name: POD_NAME
+            valueFrom:
+             fieldRef:
+               fieldPath: metadata.name
+          - name: OPERATOR_NAME
+            value: {{ include "simpledeployment-operator.name" . }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: sd-controller-manager
+      terminationGracePeriodSeconds: 10
