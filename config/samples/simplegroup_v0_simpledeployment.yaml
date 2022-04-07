@@ -1,0 +1,17 @@
+apiVersion: simplegroup.mihai.domain/v0
+kind: SimpleDeployment
+metadata:
+  name: sd1
+spec:
+  # TODO(user): Add fields here
+  replicas: 1
+  image: nginx:latest
+  ingressInfo:
+    ingressControllerType: nginx
+    ingressClassName: nginx
+    host: dev.local
+    publicPort: 443
+    path: /sd1
+    rewriteTarget: /
+
+

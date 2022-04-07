@@ -1,0 +1,16 @@
+domain: mihai.domain
+layout:
+- go.kubebuilder.io/v3
+projectName: simpledeployment
+repo: mihai.domain/simpledeployment
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: mihai.domain
+  group: simplegroup
+  kind: SimpleDeployment
+  path: mihai.domain/simpledeployment/api/v0
+  version: v0
+version: "3"

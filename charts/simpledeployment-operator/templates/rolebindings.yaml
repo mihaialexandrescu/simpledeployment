@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    homework: simpledeployment
+    helm.sh/chart: {{ include "simpledeployment-operator.chart" . }}
+  name: sd-leader-election-rolebinding
+  #namespace: sd-sys
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sd-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: sd-controller-manager
+  namespace: sd-sys
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    homework: simpledeployment
+    helm.sh/chart: {{ include "simpledeployment-operator.chart" . }}
+  name: sd-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sd-manager-role
+subjects:
+- kind: ServiceAccount
+  name: sd-controller-manager
+  namespace: sd-sys
