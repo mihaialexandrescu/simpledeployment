@@ -7,11 +7,7 @@ name: Create and publish a Docker image
 
 on:
   push:
-    branches: ['master']
-    tags: ['v*']
-  push:
-    branches: ['dev/mihai/*']
-    tags: ['ghbuild-*']
+    tags: ['v*', 'ghbuild-*']
 
 env:
   REGISTRY: ghcr.io
@@ -42,8 +38,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # tag event
-            type=ref,event=tag
+            type=semver,pattern={{raw}},value={{tag}}
+            type=raw,value={{tag}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
