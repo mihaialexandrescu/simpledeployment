@@ -7,7 +7,7 @@ set -euo pipefail
 # - helm3 ? not yet
 # - kind
 
-EX_DIR=deploy-examples/kind-with-lb
+EX_DIR=examples-deploy/kind-with-lb
 
 # Start a Kind cluster
 KIND_NAME=kind
@@ -89,7 +89,7 @@ helm upgrade --install --timeout=30s --wait \
 sleep 5s
 
 # Deploy examples
-#kubectl apply -f crd-examples/
+#kubectl apply -f examples-cr/
 
 #sleep 30s
 
