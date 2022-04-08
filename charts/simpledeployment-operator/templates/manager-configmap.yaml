@@ -19,4 +19,3 @@ metadata:
     helm.sh/chart: {{ include "simpledeployment-operator.chart" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   name: sd-manager-config
-  #namespace: sd-sys

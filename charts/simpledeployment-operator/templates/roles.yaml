@@ -92,7 +92,6 @@ metadata:
     homework: simpledeployment
     helm.sh/chart: {{ include "simpledeployment-operator.chart" . }}
   name: sd-leader-election-role
-  #namespace: sd-sys
 rules:
 - apiGroups:
   - ""

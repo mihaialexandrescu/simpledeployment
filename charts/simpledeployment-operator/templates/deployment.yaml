@@ -9,7 +9,6 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   name: sd-controller-manager
-  #namespace: sd-sys
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -30,13 +29,6 @@ spec:
         command:
         - /manager
         image: "{{ .Values.image.repository }}:{{ include "simpledeployment-operator.version" . }}"
-        env:
-          - name: POD_NAME
-            valueFrom:
-             fieldRef:
-               fieldPath: metadata.name
-          - name: OPERATOR_NAME
-            value: {{ include "simpledeployment-operator.name" . }}
         livenessProbe:
           httpGet:
             path: /healthz

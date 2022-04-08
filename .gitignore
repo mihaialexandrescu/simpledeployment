@@ -23,3 +23,8 @@ testbin/*
 *.swp
 *.swo
 *~
+
+# Mihai - certs from deploy example
+*/tls.key
+*/tls.cert
+deploy-examples/*/tmp

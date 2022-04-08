@@ -1,6 +1,5 @@
 # Adds namespace to all resources.
-#namespace: simpledeployment-system
-namespace: sd-sys
+namespace: simpledeployment-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
