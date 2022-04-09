@@ -47,17 +47,12 @@ kubectl wait --namespace cert-manager \
   --timeout=90s
 
 
-# Upload CA Key and create ClusterIssuer Resource (clusterissuer is a cluster scoped resource)
-kubectl apply --namespace cert-manager -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ca-key-pair
-data:
-  tls.crt: $(cat ${TMP_CERT_DIR}/tls.crt | base64 -w0)
-  tls.key: $(cat ${TMP_CERT_DIR}/tls.key | base64 -w0)
-EOF
+# Upload CA Key (will be referenced later in the ClusterIssuer cert-manager resource)
+kubectl create --namespace cert-manager secret generic ca-key-pair \
+	--from-file=tls.crt=${TMP_CERT_DIR}/tls.crt \
+	--from-file=tls.key=${TMP_CERT_DIR}/tls.key
 
+# Create ClusterIssuer Resource (clusterissuer is a cluster scoped resource)
 kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -102,9 +97,9 @@ LB_IP=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o=jsonpath='{
 
 echo "${LB_IP} is the LB address allocated to the IngressController."
 
-#echo "curl --cacert ${TMP_CERT_DIR}/tls.crt https://<...>"
+echo "curl --cacert ${TMP_CERT_DIR}/tls.crt https://<...>"
 
 #for VAR in $(kubectl get sd -A -o jsonpath='{.items[*].status.url}')
 #do
-#  curl --cacert $MYCACERT $VAR
+#  curl --cacert ${TMP_CERT_DIR}/tls.crt $VAR
 #done
