@@ -2,11 +2,11 @@
 
 ## Project Summary
 
-This `simpleDeployment` Operator is meant to deploys an application (currently targeted at a vanilla nginx) on top of Kubernetes using a custom resource.
+This `simpleDeployment` Operator is meant to deploy an application (currently targeted at a vanilla `nginx`) on top of Kubernetes using a CustomResource.
 
 The application is meant to be accessed via HTTPS.
 
-This project is based on kubebuilder.
+This project is based on [kubebuilder](https://book.kubebuilder.io/) v3.
 
 Development has been done on a local Kind cluster with an nginx Ingress Controller and a MetalLb load balancer.
 
@@ -15,16 +15,16 @@ Development has been done on a local Kind cluster with an nginx Ingress Controll
 
 * A running Kubernetes cluster and `kubectl`
 
-* An Ingress Controller is running in the cluster and, in the current implementation, only the [`nginx` Ingress Controller](https://kubernetes.github.io/ingress-nginx/) is supported.
+* The [`nginx` Ingress Controller](https://kubernetes.github.io/ingress-nginx/) is running in the cluster.
   * To deploy it you can use the quickstart guide [here](https://kubernetes.github.io/ingress-nginx/deploy/)
   * To expose the Ingress Controller outside the Kubernetes cluster you can use a Service of type LoadBalancer (for instance locally with MetalLB) or a NodePort.
-  * If the public port of the Ingress Controller has been changed from 443, it must be also configured in the simpleDeployment Custom Resource for this Operator.
+  * If the public port of the Ingress Controller has been changed from 443, it must be also configured in the CustomResource Spec to be accoundted for by the Operator.
 
 * To manage TLS certificates, the Operator assumes:
   * there is a `Cert-Manager` instance running
   * that a `ClusterIssuer` cluster-scoped resource named `ca-issuer` has been configured
-  * that a CA Certificate and CA Key have been uploaded in a Secret inside the same namespace as the Cert-Manager Pods and is referenced by the ClusterIssuer according to [this docs page](https://cert-manager.io/docs/configuration/ca/).
-    * a working example for local development is present in the `examples-deploy/kind-with-lb/start.sh` file (along other example setup steps)
+  * that a CA Certificate and CA Key have been uploaded in a Secret inside the same namespace as the Cert-Manager Pods and is referenced by the `ClusterIssuer` according to [this docs page](https://cert-manager.io/docs/configuration/ca/).
+    * a working example for local development is present in the [`examples-deploy/kind-with-lb/start.sh`](examples-deploy/kind-with-lb/start.sh) file (along other example setup steps)
 
 * SSL Passthrough (to extend HTTPS to the Pod) is currently not supported (missing annotation and certificate management logic for the application's Pods).
 
@@ -129,7 +129,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: dev.local
+  - host: dev.local       <<<
     http:
       paths:
       - backend:
@@ -137,22 +137,22 @@ spec:
             name: sd1-svc
             port:
               name: http
-        path: /sdp1
+        path: /sdp1         <<<
         pathType: Exact
   tls:
   - hosts:
-    - dev.local
+    - dev.local            <<<
     secretName: < ... >
 ```
 
 
 
-Examples of these configurations are provided in the `examples-cr/` directory.
+Examples of these configurations are provided in the `examples-cr/` [directory](examples-cr/).
 
 
 ## Install
 
-You can deploy the `simpleDeployment` Operator with Kubernetes manifests (and kustomize) or with the provided Helm chart (only tested with Helm3).
+You can deploy the `simpleDeployment` Operator with Kubernetes manifests (and kustomize) or with the provided [Helm chart](charts/simpledeployment-operator/) (only tested with Helm3) under the `charts` folder.
 
 Either method will install the CRD, the RBAC rules and the Operator Deployment.
 
@@ -180,6 +180,6 @@ helm upgrade --install --timeout=30s \
 
 ## Local Test Deployment with Kind
 
-There is an example bash script in the `examples-deploy` folder for a local deployment including prerequisites. This uses Kind, MetalLB (for the LoadBalancer Service), Cert-Manager in its default namespace ("cert-manager") and a locally generated CA key pair and self signed certificate uploaded to Kubernetes for the ClusterIssuer.
+There is an example bash script in the `examples-deploy/` [folder](examples-deploy/) for a local deployment including prerequisites. This uses Kind, MetalLB (for the LoadBalancer Service), Cert-Manager in its default namespace ("cert-manager") and a locally generated CA key pair and self signed certificate uploaded to Kubernetes for the ClusterIssuer.
 
 The `curl`s performed for checking at the end (if uncommented) assume a DNS entry for the configured `host` ingress rules but that can be avoided by using the `-H 'Host: <host>'` option if you want to target the LB IP.
