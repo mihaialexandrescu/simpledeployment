@@ -41,6 +41,7 @@ apiVersion: simplegroup.mihai.domain/v0
 kind: SimpleDeployment
 metadata:
   name: <...>
+  namespace: <...>
 spec:
   ... ...
   < spec components are explained below >
