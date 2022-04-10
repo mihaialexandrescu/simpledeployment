@@ -182,6 +182,6 @@ helm upgrade --install --timeout=30s \
 
 ## Local Test Deployment with Kind
 
-There is an example bash script in the `examples-deploy/` [folder](examples-deploy/) for a local deployment including prerequisites. This uses Kind, MetalLB (for the LoadBalancer Service), Cert-Manager in its default namespace ("cert-manager") and a locally generated CA key pair and self signed certificate uploaded to Kubernetes for the ClusterIssuer.
+There is an example bash script in the `examples-deploy/kind-with-lb` [folder](examples-deploy/kind-with-lb/) for a local deployment including prerequisites. This uses Kind, MetalLB (for the LoadBalancer Service), Cert-Manager in its default namespace ("cert-manager") and a locally generated CA key pair and self signed certificate uploaded to Kubernetes for the ClusterIssuer.
 
-The `curl`s performed for checking at the end (if uncommented) assume a DNS entry for the configured `host` ingress rules but that can be avoided by using the `-H 'Host: <host>'` option if you want to target the LB IP.
+The `curl`s performed for checking at the end (if uncommented) assume a DNS entry for the configured `host` ingress rules.
