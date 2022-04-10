@@ -106,7 +106,6 @@ func (r *SimpleDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-
 	// Build the deployment that we would want to see exist within the cluster
 	deployment := setupMinimalDeployment(simpleDeployment)
 	// Set the controller reference, specifying that this Deployment is controlled by the SimpleDeployment being reconciled.
