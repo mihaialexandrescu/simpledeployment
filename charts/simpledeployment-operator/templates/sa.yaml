@@ -7,4 +7,3 @@ metadata:
     app.kubernetes.io/name: {{ include "simpledeployment-operator.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   name: sd-controller-manager
-  #namespace: sd-sys

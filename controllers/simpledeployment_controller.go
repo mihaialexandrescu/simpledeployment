@@ -53,6 +53,7 @@ type SimpleDeploymentReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch
 //+kubebuilder:rbac:groups=core,resources=services/status,verbs=get
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;delete
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=get
 
@@ -68,20 +69,49 @@ type SimpleDeploymentReconciler struct {
 func (r *SimpleDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("simpleDeployment", req.NamespacedName)
 
-	log.V(3).Info("Enter Reconcile() with", "request", req)
+	log.V(1).Info("Enter Reconcile() with", "request", req)
 
-	var simpleDeployment simplegroupv0.SimpleDeployment
-	if err := r.Get(ctx, req.NamespacedName, &simpleDeployment); err != nil {
+	var simpleDeployment = &simplegroupv0.SimpleDeployment{}
+	if err := r.Get(ctx, req.NamespacedName, simpleDeployment); err != nil {
 		log.Error(err, "Unable to fetch SimpleDeployment")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.V(3).Info("Got simpleDeployment", "sdSpec", simpleDeployment.Spec)
+	log.V(1).Info("Got simpleDeployment", "sdSpec", simpleDeployment.Spec)
+
+	// Name the finalizer for TLS certs created by Cert-Manager
+	tlsSecretFinalizer := "simplegroup.mihai.domain/tls-cert"
+	// examine DeletionTimestamp to determine if object is under deletion
+	if simpleDeployment.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(simpleDeployment, tlsSecretFinalizer) {
+			controllerutil.AddFinalizer(simpleDeployment, tlsSecretFinalizer)
+			if err := r.Update(ctx, simpleDeployment); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// The object is being deleted
+		if controllerutil.ContainsFinalizer(simpleDeployment, tlsSecretFinalizer) {
+			if err := r.deleteExternalResources(ctx, simpleDeployment); err != nil {
+				// if fail to delete the external dependency here, return with error so that it can be retried
+				return ctrl.Result{}, err
+			}
+
+			controllerutil.RemoveFinalizer(simpleDeployment, tlsSecretFinalizer)
+			if err := r.Update(ctx, simpleDeployment); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		// Stop reconciliation as the item is being deleted
+		return ctrl.Result{}, nil
+	}
+
 
 	// Build the deployment that we would want to see exist within the cluster
 	deployment := setupMinimalDeployment(simpleDeployment)
 	// Set the controller reference, specifying that this Deployment is controlled by the SimpleDeployment being reconciled.
 	// This will allow for the SimpleDeployment to be reconciled when changes to the Deployment are noticed.
-	if err := controllerutil.SetControllerReference(&simpleDeployment, deployment, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(simpleDeployment, deployment, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -95,7 +125,7 @@ func (r *SimpleDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	service := setupMinimalService(simpleDeployment)
 	// Set the controller reference, specifying that this Service is controlled by the SimpleDeployment being reconciled.
 	// This will allow for the SimpleDeployment to be reconciled when changes to the Service are noticed.
-	if err := controllerutil.SetControllerReference(&simpleDeployment, service, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(simpleDeployment, service, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -109,7 +139,7 @@ func (r *SimpleDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	ingress := setupMinimalIngress(simpleDeployment)
 	// Set the controller reference, specifying that this Ingress is controlled by the SimpleDeployment being reconciled.
 	// This will allow for the SimpleDeployment to be reconciled when changes to the Ingress are noticed.
-	if err := controllerutil.SetControllerReference(&simpleDeployment, ingress, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(simpleDeployment, ingress, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -135,7 +165,7 @@ func (r *SimpleDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 	if len(upd) > 0 {
-		if err := r.Status().Update(ctx, &simpleDeployment); err != nil {
+		if err := r.Status().Update(ctx, simpleDeployment); err != nil {
 			log.Error(err, "unable to update SimpleDeployment status")
 			//return ctrl.Result{RequeueAfter: time.Second * 10}, err
 			return ctrl.Result{}, err
@@ -156,11 +186,35 @@ func (r *SimpleDeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// Mihai - func to delete external resources due to finalizer for TLS secret
+func (r *SimpleDeploymentReconciler) deleteExternalResources(ctx context.Context, sd *simplegroupv0.SimpleDeployment) error {
+	nsdname := types.NamespacedName{Name: deriveName(sd, &netv1.IngressTLS{}), Namespace: sd.Namespace}
+	log := r.Log.WithValues("finalizer", nsdname)
+	log.V(1).Info("Enter deleteExternalResources()")
+
+	foundSecret := &corev1.Secret{}
+	err := r.Get(ctx, nsdname, foundSecret)
+
+	if err != nil && errors.IsNotFound(err) {
+		log.V(1).Info("TLS Secret was not found so we can exit to remove the finalizer from SD.")
+		return nil
+	} else if err == nil {
+		log.V(1).Info("Found TLS Secret", "foundSecretUID", foundSecret.GetUID())
+		// pbly need to add logic to make sure Ingress is deleted/doesn't exist first
+		err = r.Delete(ctx, foundSecret)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Unable to delete TLS Secret %s", nsdname))
+			return err
+		}
+	}
+	return nil
+}
+
 // Mihai - func to manage Service
-func (r *SimpleDeploymentReconciler) reconcileDeployment(ctx context.Context, sd simplegroupv0.SimpleDeployment, deployment *appsv1.Deployment) error {
+func (r *SimpleDeploymentReconciler) reconcileDeployment(ctx context.Context, sd *simplegroupv0.SimpleDeployment, deployment *appsv1.Deployment) error {
 	nsdname := types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}
 	log := r.Log.WithValues("deployment", nsdname)
-	log.V(3).Info("Enter reconcileDeployment()")
+	log.V(1).Info("Enter reconcileDeployment()")
 	// Manage your Deployment.
 	// Create it if it doesn't exist. Update it if it is configured incorrectly.
 	// I'm not addressing the need to delete deplyoment and recreate in case of selector changes.
@@ -168,14 +222,14 @@ func (r *SimpleDeploymentReconciler) reconcileDeployment(ctx context.Context, sd
 	err := r.Get(ctx, nsdname, foundDeployment)
 
 	if err != nil && errors.IsNotFound(err) {
-		log.V(3).Info("Creating new Deployment", "Deployment", deployment.Name, "Spec", deployment.Spec)
+		log.V(1).Info("Creating new Deployment", "Deployment", deployment.Name, "Spec", deployment.Spec)
 		err = r.Create(ctx, deployment)
 		if err != nil {
 			log.Error(err, "Unable to create new Deployment.")
 			return err
 		}
 	} else if err == nil {
-		log.V(3).Info("Found Deployment", "foundDeploSpec", foundDeployment.Spec, "foundDeploStatus", foundDeployment.Status)
+		log.V(1).Info("Found Deployment", "foundDeploSpec", foundDeployment.Spec, "foundDeploStatus", foundDeployment.Status)
 		var upd []string // record need for update
 		if *foundDeployment.Spec.Replicas != *deployment.Spec.Replicas {
 			foundDeployment.Spec.Replicas = deployment.Spec.Replicas
@@ -188,7 +242,7 @@ func (r *SimpleDeploymentReconciler) reconcileDeployment(ctx context.Context, sd
 			}
 		}
 		if len(upd) > 0 {
-			log.V(3).Info("Need to Update existing Deployment", "updates", upd)
+			log.V(1).Info("Need to Update existing Deployment", "updates", upd)
 			err = r.Update(ctx, foundDeployment)
 			if err != nil {
 				log.Error(err, "Unable to update existing Deployment.")
@@ -201,24 +255,24 @@ func (r *SimpleDeploymentReconciler) reconcileDeployment(ctx context.Context, sd
 }
 
 // Mihai - func to manage Service
-func (r *SimpleDeploymentReconciler) reconcileService(ctx context.Context, sd simplegroupv0.SimpleDeployment, service *corev1.Service) error {
+func (r *SimpleDeploymentReconciler) reconcileService(ctx context.Context, sd *simplegroupv0.SimpleDeployment, service *corev1.Service) error {
 	nsdname := types.NamespacedName{Name: service.Name, Namespace: service.Namespace}
 	log := r.Log.WithValues("service", nsdname)
-	log.V(3).Info("Enter reconcileService()")
+	log.V(1).Info("Enter reconcileService()")
 	// Manage your Service.
 	// Create it if it doesn't exist. Update it if it is configured incorrectly.
 	foundService := &corev1.Service{}
 	err := r.Get(ctx, nsdname, foundService)
 
 	if err != nil && errors.IsNotFound(err) {
-		log.V(3).Info("Creating new Service", "Service", service.Name, "Spec", service.Spec)
+		log.V(1).Info("Creating new Service", "Service", service.Name, "Spec", service.Spec)
 		err = r.Create(ctx, service)
 		if err != nil {
 			log.Error(err, "Unable to create new Service.")
 			return err
 		}
 	} else if err == nil {
-		log.V(3).Info("Found Service", "foundSvcSpec", foundService.Spec, "foundSvcStatus", foundService.Status)
+		log.V(1).Info("Found Service", "foundSvcSpec", foundService.Spec, "foundSvcStatus", foundService.Status)
 		var upd []string // record need for update of service
 		for k, v := range setupSelectionLabels(sd) {
 			if val, ok := foundService.Spec.Selector[k]; !ok || val != v {
@@ -227,7 +281,7 @@ func (r *SimpleDeploymentReconciler) reconcileService(ctx context.Context, sd si
 			}
 		}
 		if len(upd) > 0 {
-			log.V(3).Info("Need to Update existing Service", "updates", upd)
+			log.V(1).Info("Need to Update existing Service", "updates", upd)
 			err = r.Update(ctx, foundService)
 			if err != nil {
 				log.Error(err, "Unable to update existing Service.")
@@ -240,24 +294,24 @@ func (r *SimpleDeploymentReconciler) reconcileService(ctx context.Context, sd si
 }
 
 // Mihai - func to manage Ingress resource
-func (r *SimpleDeploymentReconciler) reconcileIngress(ctx context.Context, sd simplegroupv0.SimpleDeployment, ingress *netv1.Ingress) error {
+func (r *SimpleDeploymentReconciler) reconcileIngress(ctx context.Context, sd *simplegroupv0.SimpleDeployment, ingress *netv1.Ingress) error {
 	nsdname := types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}
 	log := r.Log.WithValues("ingress", nsdname)
-	log.V(3).Info("Enter reconcileIngress()")
+	log.V(1).Info("Enter reconcileIngress()")
 	// Manage your Service.
 	// Create it if it doesn't exist. Update it if it is configured incorrectly.
 	foundIngress := &netv1.Ingress{}
 	err := r.Get(ctx, nsdname, foundIngress)
 
 	if err != nil && errors.IsNotFound(err) {
-		log.V(3).Info("Creating new Ingress", "Ingress", ingress.Name, "Spec", ingress.Spec)
+		log.V(1).Info("Creating new Ingress", "Ingress", ingress.Name, "Spec", ingress.Spec)
 		err = r.Create(ctx, ingress)
 		if err != nil {
 			log.Error(err, "Unable to create new Ingress.")
 			return err
 		}
 	} else if err == nil {
-		log.V(3).Info("Found Ingress", "foundIngrSpec", foundIngress.Spec, "foundIngrStatus", foundIngress.Status)
+		log.V(1).Info("Found Ingress", "foundIngrSpec", foundIngress.Spec, "foundIngrStatus", foundIngress.Status)
 		var upd []string // record need for update of service
 		for k, v := range ingress.Labels {
 			if val, ok := foundIngress.Labels[k]; !ok || val != v {
@@ -272,7 +326,7 @@ func (r *SimpleDeploymentReconciler) reconcileIngress(ctx context.Context, sd si
 			upd = append(upd, "Annotation rewrite-target=true")
 		}
 		if len(upd) > 0 {
-			log.V(3).Info("Need to Update existing Ingress", "updates", upd)
+			log.V(1).Info("Need to Update existing Ingress", "updates", upd)
 			err = r.Update(ctx, foundIngress)
 			if err != nil {
 				log.Error(err, "Unable to update existing Ingress.")
@@ -284,7 +338,7 @@ func (r *SimpleDeploymentReconciler) reconcileIngress(ctx context.Context, sd si
 }
 
 // Mihai - helper for almost-minimal Deployment structure
-func setupMinimalDeployment(sd simplegroupv0.SimpleDeployment) *appsv1.Deployment {
+func setupMinimalDeployment(sd *simplegroupv0.SimpleDeployment) *appsv1.Deployment {
 	name := deriveName(sd, &appsv1.Deployment{})
 	labels := setupSelectionLabels(sd)
 	// Build the deployment that we want to see exist within the cluster
@@ -324,7 +378,7 @@ func setupMinimalDeployment(sd simplegroupv0.SimpleDeployment) *appsv1.Deploymen
 }
 
 // Mihai - helper for almost-minimal Service structure
-func setupMinimalService(sd simplegroupv0.SimpleDeployment) *corev1.Service {
+func setupMinimalService(sd *simplegroupv0.SimpleDeployment) *corev1.Service {
 	name := deriveName(sd, &corev1.Service{}) // didn't treat the error case of ""
 	labels := setupSelectionLabels(sd)
 	// Build the Service that we want to see exist within the cluster
@@ -349,7 +403,7 @@ func setupMinimalService(sd simplegroupv0.SimpleDeployment) *corev1.Service {
 }
 
 // Mihai - helper for almost-minimal Ingress structure
-func setupMinimalIngress(sd simplegroupv0.SimpleDeployment) *netv1.Ingress {
+func setupMinimalIngress(sd *simplegroupv0.SimpleDeployment) *netv1.Ingress {
 	sdIngr := sd.Spec.IngressInfo
 	// Build a few default items
 	name := deriveName(sd, &netv1.Ingress{})
@@ -372,7 +426,7 @@ func setupMinimalIngress(sd simplegroupv0.SimpleDeployment) *netv1.Ingress {
 			TLS: []netv1.IngressTLS{
 				{
 					Hosts:      []string{sdIngr.Host},
-					SecretName: deriveName(sd, netv1.IngressTLS{}),
+					SecretName: deriveName(sd, &netv1.IngressTLS{}),
 				},
 			},
 			Rules: []netv1.IngressRule{
@@ -405,7 +459,7 @@ func setupMinimalIngress(sd simplegroupv0.SimpleDeployment) *netv1.Ingress {
 }
 
 // Mihai - helper for backend service name
-func deriveName(sd simplegroupv0.SimpleDeployment, t interface{}) string {
+func deriveName(sd *simplegroupv0.SimpleDeployment, t interface{}) string {
 	var suff string
 	switch t.(type) {
 	case *appsv1.Deployment:
@@ -414,7 +468,7 @@ func deriveName(sd simplegroupv0.SimpleDeployment, t interface{}) string {
 		suff = "-svc"
 	case *netv1.Ingress:
 		suff = "-ingr"
-	case netv1.IngressTLS:
+	case *netv1.IngressTLS:
 		suff = "-ingr-tls"
 	default:
 		return ""
@@ -423,7 +477,7 @@ func deriveName(sd simplegroupv0.SimpleDeployment, t interface{}) string {
 }
 
 // Mihai - helper for LabelSelector
-func setupSelectionLabels(sd simplegroupv0.SimpleDeployment) map[string]string {
+func setupSelectionLabels(sd *simplegroupv0.SimpleDeployment) map[string]string {
 	return map[string]string{
 		"sd-member": "true",
 		"sd":        sd.Name,
@@ -433,7 +487,7 @@ func setupSelectionLabels(sd simplegroupv0.SimpleDeployment) map[string]string {
 
 // Mihai - helper for Ingress Annotations
 // pbly better as a method in of simplegroupv0.SimpleDeployment
-func deriveIngressAnnotations(sd simplegroupv0.SimpleDeployment, annot map[string]string) {
+func deriveIngressAnnotations(sd *simplegroupv0.SimpleDeployment, annot map[string]string) {
 	// Add annotation for cert-manager cluster-issuer with default name for this project
 	annot["cert-manager.io/cluster-issuer"] = "ca-issuer"
 
@@ -453,7 +507,7 @@ func deriveIngressAnnotations(sd simplegroupv0.SimpleDeployment, annot map[strin
 
 // Mihai - helper to compose URL reported in Status
 // this should probably be a Method of the simplegroupv0.SimpleDeployment type
-func deriveURL(sd simplegroupv0.SimpleDeployment) string {
+func deriveURL(sd *simplegroupv0.SimpleDeployment) string {
 	sp := sd.Spec.IngressInfo
 	var url string
 	switch sp.PublicPort {

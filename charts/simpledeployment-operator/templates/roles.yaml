@@ -27,6 +27,15 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - secrets
+  verbs:
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - create
@@ -92,7 +101,6 @@ metadata:
     homework: simpledeployment
     helm.sh/chart: {{ include "simpledeployment-operator.chart" . }}
   name: sd-leader-election-role
-  #namespace: sd-sys
 rules:
 - apiGroups:
   - ""
