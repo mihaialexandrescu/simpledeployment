@@ -78,7 +78,6 @@ func (r *SimpleDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	log.V(1).Info("Got simpleDeployment", "sdSpec", simpleDeployment.Spec)
 
-	// --------------------------------------------------------------
 	// Name the finalizer for TLS certs created by Cert-Manager
 	tlsSecretFinalizer := "simplegroup.mihai.domain/tls-cert"
 	// examine DeletionTimestamp to determine if object is under deletion
@@ -107,7 +106,6 @@ func (r *SimpleDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
-	// ---------------------------------------------------------------
 
 	// Build the deployment that we would want to see exist within the cluster
 	deployment := setupMinimalDeployment(simpleDeployment)
