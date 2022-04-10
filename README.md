@@ -35,14 +35,15 @@ Development has been done on a local Kind cluster with an nginx Ingress Controll
 
 ## Configuration/User input for the CustomResource
 
-The CustomResource used is illustrated below:
+The `SimpleDeployment` CustomResource is Namespaced and its structure is illustrated below:
 ```
 apiVersion: simplegroup.mihai.domain/v0
 kind: SimpleDeployment
 metadata:
-  name: sd2
+  name: <...>
 spec:
   ... ...
+  < spec components are explained below >
 ```
 
 The `spec` of these CustomResources has the following elements:
