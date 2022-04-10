@@ -1,6 +1,6 @@
 # Homework simpledeployment Operator Helm Chart
 
-This directory contains a Kubernetes Helm chart to deploy the operator built in this homework.
+This directory contains a Kubernetes Helm chart to deploy the "simpleDeployment" Operator from this repo.
 
 ## Prerequisites
 
@@ -11,13 +11,11 @@ This directory contains a Kubernetes Helm chart to deploy the operator built in 
 
 ### Fresh install
 
-To install the chart on a fresh cluster, use the following:
+To install the chart on a fresh cluster, use the following (assuming you are in this folder):
 
 ```bash
-helm repo add ??banzaicloud-stable ???https://kubernetes-charts.banzaicloud.com
-helm upgrade --install --namespace sd-sys --create-namespace sd-oper .
+helm upgrade --install --namespace simpledeployment-system --create-namespace sd-oper-release .
 ```
-
 
 ## Configuration
 
@@ -25,6 +23,6 @@ The exposed configuration is very limited.
 
 | Parameter                    | Description                                              | Default                      |
 | ---------------------------- | -------------------------------------------------------- | ---------------------------- |
-| `image.repository`           | Container image to use                                   | `simpledeployment????`       |
-| `image.tag`                  | Container image tag to deploy operator in                | `.Chart.AppVersion`          |
-| `replicaCount`               | k8s replicas                                             | `1`                          |
+| `image.repository`           | Container image to use for the app (nginx)               |                              |
+| `image.tag`                  | Container image tag for the app (nginx)                  | `.Chart.AppVersion`          |
+| `replicaCount`               | Replicas to be configured in the Deployment for the app  | `1`                          |
