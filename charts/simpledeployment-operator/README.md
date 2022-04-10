@@ -19,10 +19,10 @@ helm upgrade --install --namespace simpledeployment-system --create-namespace sd
 
 ## Configuration
 
-The exposed configuration is very limited.
+The current exposed configuration for the Operator components through `values.yaml` is limited.
 
-| Parameter                    | Description                                              | Default                      |
-| ---------------------------- | -------------------------------------------------------- | ---------------------------- |
-| `image.repository`           | Container image to use for the app (nginx)               |                              |
-| `image.tag`                  | Container image tag for the app (nginx)                  | `.Chart.AppVersion`          |
-| `replicaCount`               | Replicas to be configured in the Deployment for the app  | `1`                          |
+| Parameter                    | Description                                                | Default                      |
+| ---------------------------- | ---------------------------------------------------------- | ---------------------------- |
+| `image.repository`           | Container image to use to run the Operator                 |                              |
+| `image.tag`                  | Container image tag for the Operator                       | `.Chart.AppVersion`          |
+| `replicaCount`               | For the Deployment managing the Pods running the Operator  | `1`                          |

@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
   name: sd-controller-manager
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ default 1 .Values.replicaCount }}
   selector:
     matchLabels:
       control-plane: controller-manager
